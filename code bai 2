@@ -1,0 +1,484 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Windows.Forms;
+
+// =====================================================
+// 1. ENTITY
+// =====================================================
+namespace QuanLySinhVien.Data.Entity
+{
+    public class LopHoc
+    {
+        public string MaLop { get; set; } = "";
+        public string TenLop { get; set; } = "";
+    }
+
+    public class SinhVien
+    {
+        [Required(ErrorMessage = "Mã sinh viên không được để trống!")]
+        public string MaSV { get; set; } = "";
+
+        [Required(ErrorMessage = "Họ tên không được để trống!")]
+        public string HoTen { get; set; } = "";
+
+        public DateTime NgaySinh { get; set; } = DateTime.Today;
+
+        public string GioiTinh { get; set; } = "Nam";
+
+        [Required(ErrorMessage = "Email không được để trống!")]
+        [EmailAddress(ErrorMessage = "Email không đúng định dạng!")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Số điện thoại không được để trống!")]
+        [Phone(ErrorMessage = "Số điện thoại không đúng định dạng!")]
+        public string SoDienThoai { get; set; } = "";
+
+        [Required(ErrorMessage = "Chưa chọn lớp!")]
+        public string MaLop { get; set; } = "";
+
+        [Range(0, 10, ErrorMessage = "Điểm phải từ 0 đến 10!")]
+        public double Diem { get; set; }
+
+        public List<ValidationResult> IsInValid()
+        {
+            var results = new List<ValidationResult>();
+            var context = new ValidationContext(this);
+
+            Validator.TryValidateObject(this, context, results, validateAllProperties: true);
+
+            return results;
+        }
+    }
+}
+
+// =====================================================
+// 2. DAL
+// =====================================================
+namespace QuanLySinhVien.Data.DAL
+{
+    using QuanLySinhVien.Data.Entity;
+
+    public class LopDAL
+    {
+        private readonly List<LopHoc> lopHocs = new List<LopHoc>
+        {
+            new LopHoc { MaLop = "CSE0001", TenLop = "Khoa học máy tính 01" },
+            new LopHoc { MaLop = "CSE0002", TenLop = "Khoa học máy tính 02" },
+            new LopHoc { MaLop = "CSE0003", TenLop = "Khoa học máy tính 03" }
+        };
+
+        public List<LopHoc> GetAllLopHoc()
+        {
+            return lopHocs;
+        }
+    }
+
+    public class SinhVienDAL
+    {
+        private static readonly List<SinhVien> sinhViens = new List<SinhVien>();
+
+        public List<SinhVien> GetAllSinhVien()
+        {
+            return sinhViens.ToList();
+        }
+
+        public SinhVien GetSinhVienById(string maSV)
+        {
+            return sinhViens.FirstOrDefault(sv => sv.MaSV.Equals(maSV, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public List<SinhVien> GetSinhViensByMaLop(string maLop)
+        {
+            return sinhViens.Where(sv => sv.MaLop == maLop).ToList();
+        }
+
+        public void AddSinhVien(SinhVien sv)
+        {
+            sinhViens.Add(sv);
+        }
+
+        public bool DeleteSinhVien(string maSV)
+        {
+            SinhVien sv = GetSinhVienById(maSV);
+
+            if (sv == null)
+                return false;
+
+            sinhViens.Remove(sv);
+            return true;
+        }
+    }
+}
+
+// =====================================================
+// 3. BUSINESS LOGIC
+// =====================================================
+namespace QuanLySinhVien.BUL
+{
+    using QuanLySinhVien.Data.DAL;
+    using QuanLySinhVien.Data.Entity;
+
+    public class LopBus
+    {
+        private readonly LopDAL lopDAL = new LopDAL();
+
+        public List<LopHoc> GetAllLopHoc()
+        {
+            return lopDAL.GetAllLopHoc();
+        }
+    }
+
+    public class SinhVienBUL
+    {
+        private readonly SinhVienDAL svd = new SinhVienDAL();
+
+        public List<SinhVien> GetAllSinhVien()
+        {
+            return svd.GetAllSinhVien();
+        }
+
+        public List<SinhVien> GetSinhViensByMaLop(string maLop)
+        {
+            return svd.GetSinhViensByMaLop(maLop);
+        }
+
+        public SinhVien GetSinhVienById(string maSV)
+        {
+            return svd.GetSinhVienById(maSV);
+        }
+
+        public void AddSinhVien(SinhVien sv)
+        {
+            if (svd.GetSinhVienById(sv.MaSV) != null)
+                throw new Exception("Mã sinh viên đã tồn tại!");
+
+            svd.AddSinhVien(sv);
+        }
+
+        public bool DeleteSinhVien(string maSV)
+        {
+            return svd.DeleteSinhVien(maSV);
+        }
+    }
+}
+
+// =====================================================
+// 4. GUI - GIAO DIỆN WINDOWS FORMS
+// =====================================================
+namespace QuanLySinhVien.GUI
+{
+    using QuanLySinhVien.BUL;
+    using QuanLySinhVien.Data.Entity;
+
+    public class frmSinhVien : Form
+    {
+        private readonly LopBus lopBus = new LopBus();
+        private readonly SinhVienBUL svb = new SinhVienBUL();
+
+        private readonly ComboBox cboLop = new ComboBox();
+        private readonly TextBox txtMaSV = new TextBox();
+        private readonly TextBox txtHoTen = new TextBox();
+        private readonly TextBox txtEmail = new TextBox();
+        private readonly TextBox txtDienThoai = new TextBox();
+        private readonly DateTimePicker dtpNgaySinh = new DateTimePicker();
+        private readonly NumericUpDown numDiem = new NumericUpDown();
+        private readonly RadioButton rdoNam = new RadioButton();
+        private readonly RadioButton rdoNu = new RadioButton();
+        private readonly DataGridView dgvSinhVien = new DataGridView();
+
+        private readonly Button butThem = new Button();
+        private readonly Button butTim = new Button();
+        private readonly Button butXoa = new Button();
+        private readonly Button butLamMoi = new Button();
+
+        public frmSinhVien()
+        {
+            Text = "QUẢN LÝ SINH VIÊN";
+            StartPosition = FormStartPosition.CenterScreen;
+            Width = 1000;
+            Height = 700;
+            MinimumSize = new System.Drawing.Size(850, 600);
+
+            TaoGiaoDien();
+
+            Load += frmSinhVien_Load;
+            butThem.Click += butThem_Click;
+            butTim.Click += butTim_Click;
+            butXoa.Click += butXoa_Click;
+            butLamMoi.Click += (s, e) => LamMoi();
+            cboLop.SelectedIndexChanged += cboLop_SelectedIndexChanged;
+            dgvSinhVien.CellClick += dgvSinhVien_CellClick;
+        }
+
+        private void TaoGiaoDien()
+        {
+            var lblTieuDe = new Label
+            {
+                Text = "QUẢN LÝ SINH VIÊN",
+                Left = 20, Top = 15, Width = 920, Height = 35,
+                Font = new System.Drawing.Font("Arial", 16, System.Drawing.FontStyle.Bold),
+                TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+            };
+            Controls.Add(lblTieuDe);
+
+            ThemNhan("Mã sinh viên:", 25, 75);
+            ThemControl(txtMaSV, 145, 72, 250);
+
+            ThemNhan("Họ và tên:", 25, 115);
+            ThemControl(txtHoTen, 145, 112, 250);
+
+            ThemNhan("Ngày sinh:", 25, 155);
+            ThemControl(dtpNgaySinh, 145, 152, 250);
+
+            ThemNhan("Giới tính:", 25, 195);
+            rdoNam.Text = "Nam";
+            rdoNu.Text = "Nữ";
+            ThemControl(rdoNam, 145, 192, 70);
+            ThemControl(rdoNu, 220, 192, 70);
+            rdoNam.Checked = true;
+
+            ThemNhan("Email:", 460, 75);
+            ThemControl(txtEmail, 555, 72, 300);
+
+            ThemNhan("Điện thoại:", 460, 115);
+            ThemControl(txtDienThoai, 555, 112, 300);
+
+            ThemNhan("Lớp:", 460, 155);
+            ThemControl(cboLop, 555, 152, 300);
+            cboLop.DropDownStyle = ComboBoxStyle.DropDownList;
+
+            ThemNhan("Điểm:", 460, 195);
+            numDiem.Minimum = 0;
+            numDiem.Maximum = 10;
+            numDiem.DecimalPlaces = 2;
+            numDiem.Increment = 0.25M;
+            ThemControl(numDiem, 555, 192, 120);
+
+            DatNut(butThem, "Thêm sinh viên", 25, 245, 150);
+            DatNut(butTim, "Tìm theo mã", 190, 245, 130);
+            DatNut(butXoa, "Xóa sinh viên", 335, 245, 140);
+            DatNut(butLamMoi, "Làm mới", 490, 245, 110);
+
+            dgvSinhVien.Left = 25;
+            dgvSinhVien.Top = 295;
+            dgvSinhVien.Width = 920;
+            dgvSinhVien.Height = 330;
+            dgvSinhVien.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dgvSinhVien.ReadOnly = true;
+            dgvSinhVien.AllowUserToAddRows = false;
+            dgvSinhVien.AllowUserToDeleteRows = false;
+            dgvSinhVien.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvSinhVien.MultiSelect = false;
+            dgvSinhVien.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+            Controls.Add(dgvSinhVien);
+        }
+
+        private void ThemNhan(string text, int x, int y)
+        {
+            Controls.Add(new Label
+            {
+                Text = text,
+                Left = x,
+                Top = y + 4,
+                Width = 115,
+                Height = 25
+            });
+        }
+
+        private void ThemControl(Control control, int x, int y, int width)
+        {
+            control.Left = x;
+            control.Top = y;
+            control.Width = width;
+            control.Height = 25;
+            Controls.Add(control);
+        }
+
+        private void DatNut(Button button, string text, int x, int y, int width)
+        {
+            button.Text = text;
+            button.SetBounds(x, y, width, 32);
+            Controls.Add(button);
+        }
+
+        private void frmSinhVien_Load(object sender, EventArgs e)
+        {
+            cboLop.DataSource = lopBus.GetAllLopHoc();
+            cboLop.DisplayMember = "TenLop";
+            cboLop.ValueMember = "MaLop";
+
+            HienThiDanhSach();
+        }
+
+        private void HienThiDanhSach()
+        {
+            string maLop = cboLop.SelectedValue?.ToString();
+
+            if (string.IsNullOrEmpty(maLop))
+                dgvSinhVien.DataSource = svb.GetAllSinhVien();
+            else
+                dgvSinhVien.DataSource = svb.GetSinhViensByMaLop(maLop);
+        }
+
+        private void cboLop_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (IsHandleCreated)
+                HienThiDanhSach();
+        }
+
+        private void butThem_Click(object sender, EventArgs e)
+        {
+            var sv = new SinhVien
+            {
+                MaSV = txtMaSV.Text.Trim(),
+                HoTen = txtHoTen.Text.Trim(),
+                NgaySinh = dtpNgaySinh.Value.Date,
+                GioiTinh = rdoNam.Checked ? "Nam" : "Nữ",
+                Email = txtEmail.Text.Trim(),
+                SoDienThoai = txtDienThoai.Text.Trim(),
+                MaLop = cboLop.SelectedValue?.ToString() ?? "",
+                Diem = (double)numDiem.Value
+            };
+
+            List<ValidationResult> errors = sv.IsInValid();
+
+            if (errors.Count > 0)
+            {
+                string message = string.Join(Environment.NewLine, errors.Select(x => x.ErrorMessage));
+                MessageBox.Show(message, "Dữ liệu chưa hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                svb.AddSinhVien(sv);
+                MessageBox.Show("Thêm sinh viên thành công!");
+
+                HienThiDanhSach();
+                LamMoi();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void butTim_Click(object sender, EventArgs e)
+        {
+            string maSV = txtMaSV.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(maSV))
+            {
+                MessageBox.Show("Hãy nhập mã sinh viên cần tìm!");
+                txtMaSV.Focus();
+                return;
+            }
+
+            SinhVien sv = svb.GetSinhVienById(maSV);
+
+            if (sv == null)
+            {
+                MessageBox.Show("Không tìm thấy sinh viên!");
+                return;
+            }
+
+            txtMaSV.Text = sv.MaSV;
+            txtHoTen.Text = sv.HoTen;
+            txtEmail.Text = sv.Email;
+            txtDienThoai.Text = sv.SoDienThoai;
+
+            if (sv.NgaySinh >= dtpNgaySinh.MinDate && sv.NgaySinh <= dtpNgaySinh.MaxDate)
+                dtpNgaySinh.Value = sv.NgaySinh;
+
+            rdoNam.Checked = sv.GioiTinh == "Nam";
+            rdoNu.Checked = sv.GioiTinh == "Nữ";
+            numDiem.Value = (decimal)sv.Diem;
+            cboLop.SelectedValue = sv.MaLop;
+
+            dgvSinhVien.DataSource = new List<SinhVien> { sv };
+        }
+
+        private void butXoa_Click(object sender, EventArgs e)
+        {
+            string maSV = txtMaSV.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(maSV))
+            {
+                MessageBox.Show("Hãy nhập mã sinh viên cần xóa!");
+                return;
+            }
+
+            DialogResult result = MessageBox.Show("Cậu có chắc muốn xóa sinh viên này?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (result != DialogResult.Yes)
+                return;
+
+            if (svb.DeleteSinhVien(maSV))
+            {
+                MessageBox.Show("Xóa sinh viên thành công!");
+                LamMoi();
+                HienThiDanhSach();
+            }
+            else
+            {
+                MessageBox.Show("Không tìm thấy sinh viên!");
+            }
+        }
+
+        private void dgvSinhVien_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+                return;
+
+            if (dgvSinhVien.Rows[e.RowIndex].DataBoundItem is SinhVien sv)
+            {
+                txtMaSV.Text = sv.MaSV;
+                txtHoTen.Text = sv.HoTen;
+                txtEmail.Text = sv.Email;
+                txtDienThoai.Text = sv.SoDienThoai;
+                dtpNgaySinh.Value = sv.NgaySinh;
+                rdoNam.Checked = sv.GioiTinh == "Nam";
+                rdoNu.Checked = sv.GioiTinh == "Nữ";
+                numDiem.Value = (decimal)sv.Diem;
+                cboLop.SelectedValue = sv.MaLop;
+            }
+        }
+
+        private void LamMoi()
+        {
+            txtMaSV.Clear();
+            txtHoTen.Clear();
+            txtEmail.Clear();
+            txtDienThoai.Clear();
+
+            dtpNgaySinh.Value = DateTime.Today;
+            rdoNam.Checked = true;
+            numDiem.Value = 0;
+
+            if (cboLop.Items.Count > 0)
+                cboLop.SelectedIndex = 0;
+
+            txtMaSV.Focus();
+        }
+    }
+}
+
+// =====================================================
+// 5. ENTRY POINT
+// =====================================================
+namespace QuanLySinhVien
+{
+    internal static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new GUI.frmSinhVien());
+        }
+    }
+}
